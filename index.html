@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo de Esquiva</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #056399;
+        }
+        canvas {
+            background-color: #000000;
+            display: block;
+            margin: 0 auto;
+        }
+        .hidden {
+            display: none;
+        }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            border: 1px solid #ffffff;
+            background-color: #056399;
+            z-index: 10;
+        }
+        #gameOverScreen button {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <h1>Bem-vindo</h1>
+        <button onclick="startGame()">Clique para iniciar</button>
+        <h2>Esquive dos obstáculos vermelhos e pegue os verdes</h2>
+    </div>
+
+    <div id="gameOverScreen" class="hidden">
+        <h1>Game Over</h1>
+        <p>Pontuação: <span id="finalScore"></span></p>
+        <p>Pontuação mais alta: <span id="highScore"></span></p>
+        <button onclick="restartGame()">Reiniciar</button>
+        <button onclick="showStartScreen()">Tela Inicial</button>
+    </div>
+
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+    <!-- Adiciona a tag de áudio -->
+    <audio id="backgroundMusic" src='C:\Users\LabInfo\Desktop\kauã.r\jogo2\lady-of-the-80x27s-128379.mp3' loop></audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreElement = document.getElementById('finalScore');
+        const highScoreElement = document.getElementById('highScore');
+        const backgroundMusic = document.getElementById('backgroundMusic'); // Seleciona o elemento de áudio
+
+        let player, obstacles, score, gameInterval, obstacleInterval, speed, obstacleCreationInterval;
+        let isGameOver = false;
+
+        function initializeGame() {
+            player = { x: 200, y: 500, width: 30, height: 30, color: 'blue' };
+            obstacles = [];
+            score = 0;
+            speed = 10;
+            obstacleCreationInterval = 1200; // Inicialmente, cria um obstáculo a cada 1200ms
+            isGameOver = false;
+            canvas.style.display = 'block';
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+        }
+
+        function createObstacle() {
+            if (!isGameOver) {
+                const x = Math.random() * (canvas.width - 30);
+                const type = Math.random() < 0.2 ? 'bonus' : 'normal'; // 20% chance de criar um obstáculo de bônus
+                const shape = ['rectangle', 'circle', 'triangle'][Math.floor(Math.random() * 3)]; // Forma aleatória
+                obstacles.push({ x: x, y: 0, width: 30, height: 30, type: type, shape: shape, exploded: false });
+            }
+        }
+
+        function update() {
+            // Atualiza a posição dos obstáculos
+            for (let obs of obstacles) {
+                if (obs.exploded) {
+                    obs.explosionTime -= 1;
+                    if (obs.explosionTime <= 0) {
+                        obstacles.shift(); // Remove o obstáculo após a explosão
+                    }
+                    continue;
+                }
+                
+                obs.y += speed;
+                if (obs.y > canvas.height) {
+                    obstacles.shift();
+                    score++;
+                    adjustObstacleSpeed();
+                    adjustObstacleCreationInterval();
+                }
+            }
+            // Detecta colisão
+            for (let obs of obstacles) {
+                if (!obs.exploded && player.x < obs.x + obs.width &&
+                    player.x + player.width > obs.x &&
+                    player.y < obs.y + obs.height &&
+                    player.y + player.height > obs.y) {
+                    if (obs.type === 'bonus') {
+                        obs.exploded = true;
+                        obs.explosionTime = 10; // Duração da explosão
+                        score += 5; // Pontuação extra por explodir um obstáculo bônus
+                    } else {
+                        gameOver();
+                    }
+                }
+            }
+        }
+
+        function adjustObstacleSpeed() {
+            // Aumenta a velocidade dos obstáculos a cada 5 pontos de score
+            if (score % 5 === 0) {
+                speed += 0.5;
+            }
+        }
+
+        function adjustObstacleCreationInterval() {
+            // Reduz o intervalo de criação de obstáculos a cada 10 pontos de score
+            if (score % 10 === 0 && obstacleCreationInterval > 500) {
+                obstacleCreationInterval -= 400; // Reduz o intervalo em 400ms, com um intervalo mínimo de 500ms
+                clearInterval(obstacleInterval);
+                obstacleInterval = setInterval(createObstacle, obstacleCreationInterval);
+            }
+        }
+
+        function drawExplosion(x, y) {
+            ctx.fillStyle = 'yellow';
+            ctx.beginPath();
+            ctx.arc(x + 15, y + 15, 20, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'orange';
+            ctx.beginPath();
+            ctx.arc(x + 15, y + 15, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(x + 15, y + 15, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            for (let obs of obstacles) {
+                if (obs.exploded) {
+                    drawExplosion(obs.x, obs.y);
+                } else {
+                    ctx.fillStyle = obs.type === 'bonus' ? 'green' : 'red'; // Obstáculos de bônus são verdes
+                    switch (obs.shape) {
+                        case 'rectangle':
+                            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                            break;
+                        case 'circle':
+                            ctx.beginPath();
+                            ctx.arc(obs.x + obs.width / 2, obs.y + obs.height / 2, obs.width / 2, 0, Math.PI * 2);
+                            ctx.fill();
+                            break;
+                        case 'triangle':
+                            ctx.beginPath();
+                            ctx.moveTo(obs.x, obs.y + obs.height);
+                            ctx.lineTo(obs.x + obs.width / 2, obs.y);
+                            ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
+                            ctx.closePath();
+                            ctx.fill();
+                            break;
+                    }
+                }
+            }
+
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText("Score: " + score, 10, 20);
+        }
+
+        function gameLoop() {
+            if (!isGameOver) {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function increaseDifficulty() {
+            if (!isGameOver) {
+                speed += 0.01;
+            }
+        }
+
+        function saveHighScore(score) {
+            const highScore = localStorage.getItem('highScore') || 0;
+            if (score > highScore) {
+                localStorage.setItem('highScore', score);
+            }
+        }
+
+        function getHighScore() {
+            return localStorage.getItem('highScore') || 0;
+        }
+
+        function startMusic() {
+            backgroundMusic.play(); // Inicia a música
+        }
+
+        function stopMusic() {
+            backgroundMusic.pause(); // Para a música
+            backgroundMusic.currentTime = 0; // Reseta a posição da música para o início
+        }
+
+        function startGame() {
+            initializeGame();
+            obstacleInterval = setInterval(createObstacle, obstacleCreationInterval);
+            gameInterval = setInterval(increaseDifficulty, 1000);
+            gameLoop();
+            startMusic(); // Inicia a música quando o jogo começa
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            clearInterval(obstacleInterval);
+            clearInterval(gameInterval);
+            stopMusic(); // Para a música quando o jogo acaba
+
+            canvas.style.display = 'none';
+            gameOverScreen.style.display = 'block';
+            finalScoreElement.textContent = score;
+
+            // Salva a pontuação se for a mais alta
+            saveHighScore(score);
+            highScoreElement.textContent = getHighScore();
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        function showStartScreen() {
+            initializeGame();
+            canvas.style.display = 'none';
+            startScreen.style.display = 'block';
+        }
+
+        document.addEventListener('keydown', function (event) {
+            const movementAmount = 30; // Aumenta a velocidade do jogador para 30 pixels por vez
+            if (event.key === 'ArrowLeft' && player.x > 0) {
+                player.x -= movementAmount;
+            }
+            if (event.key === 'ArrowRight' && player.x < canvas.width - player.width) {
+                player.x += movementAmount;
+            }
+        });
+
+        window.onload = function() {
+            highScoreElement.textContent = getHighScore();
+        };
+
+        showStartScreen();
+    </script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo de Esquiva</title>
+    <style>
+        canvas {
+            background-color: #f0f0f0;
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let player = { x: 200, y: 500, width: 30, height: 30, color: 'blue' };
+        let obstacles = [];
+        let score = 0;
+
+        function createObstacle() {
+            const x = Math.random() * 370;
+            obstacles.push({ x: x, y: 0, width: 30, height: 30, color: 'red' });
+        }
+
+        function update() {
+            // Atualiza a posição dos obstáculos
+            for (let obs of obstacles) {
+                obs.y += 5;
+                if (obs.y > 600) {
+                    obstacles.shift();
+                    score++;
+                }
+            }
+            // Detecta colisão
+            for (let obs of obstacles) {
+                if (player.x < obs.x + obs.width &&
+                    player.x + player.width > obs.x &&
+                    player.y < obs.y + obs.height &&
+                    player.y + player.height > obs.y) {
+                    alert("Game Over! Score: " + score);
+                    document.location.reload();
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            for (let obs of obstacles) {
+                ctx.fillStyle = obs.color;
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            }
+
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.fillText("Score: " + score, 10, 20);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowLeft' && player.x > 0) {
+                player.x -= 20;
+            }
+            if (event.key === 'ArrowRight' && player.x < 370) {
+                player.x += 20;
+            }
+        });
+
+        setInterval(createObstacle, 2000);
+        gameLoop();
+    </script>
+</body>
+</html>
